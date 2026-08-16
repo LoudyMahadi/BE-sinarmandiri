@@ -32,7 +32,7 @@ export const getTickets = async (req: Request, res: Response) => {
 
   let query = supabase
     .from('machine_tickets')
-    .select('id, machine_name, description, urgency, status, created_at, updated_at, store:stores(name)')
+    .select('id, machine_name, description, urgency, status, sparepart_needed, sparepart_fulfilled, created_at, updated_at, store:stores(name)')
     .order('created_at', { ascending: false });
 
   if (active_only === 'true') {
@@ -101,4 +101,47 @@ export const updateTicketStatus = async (req: Request, res: Response) => {
   await supabase.from('ticket_logs').insert({ ticket_id: id, status, note });
 
   res.json({ success: true, ticket: updated });
+};
+
+export const updateSparepartInfo = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { sparepart_needed } = req.body;
+
+  const { data, error } = await supabase
+    .from('machine_tickets')
+    .update({ sparepart_needed, sparepart_fulfilled: false })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  await supabase.from('ticket_logs').insert({
+    ticket_id: id,
+    status: 'dicek',
+    note: `Membutuhkan sparepart: ${sparepart_needed}`,
+  });
+
+  res.json({ success: true, ticket: data });
+};
+
+export const markSparepartFulfilled = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const { data, error } = await supabase
+    .from('machine_tickets')
+    .update({ sparepart_fulfilled: true })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  await supabase.from('ticket_logs').insert({
+    ticket_id: id,
+    status: 'dicek',
+    note: 'Sparepart telah dibeli/tersedia',
+  });
+
+  res.json({ success: true, ticket: data });
 };
